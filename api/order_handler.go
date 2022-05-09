@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -75,6 +76,7 @@ func (oh *OrderHandler) GetOrderWithProductsAndShipments(w http.ResponseWriter, 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	//TODO: join everything in one query and benchmark against concurrent different calls
 	products, errDbGetProductsByOrderId := oh.store.GetProductsByOrderId(orderUuid)
 	if errDbGetProductsByOrderId != nil {
 		log.Println(errDbGetProductsByOrderId)
@@ -90,9 +92,8 @@ func (oh *OrderHandler) GetOrderWithProductsAndShipments(w http.ResponseWriter, 
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		response[product.ID.String()] = shipments
+		response[fmt.Sprintf("shipment_itemId_%s", product.ID.String())] = shipments
 	}
-
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }

@@ -49,6 +49,7 @@ func (sh *ShipmentHandler) CreateNewShipmentWithItems(w http.ResponseWriter, r *
 	var wg sync.WaitGroup
 	wg.Add(len(items))
 	//TODO: this works but would be more efficient using bulk sql insert instead of single
+	//TODO: add verification for quantity to not be greater than order_item quantity
 	for item, quantity := range items {
 		go func(itemId uuid.UUID, quantity int) {
 			errDbAddProductToShipment := sh.store.AddProductToShipment(shipment.ID, itemId, quantity)
