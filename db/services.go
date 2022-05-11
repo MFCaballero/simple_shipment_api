@@ -44,10 +44,24 @@ type ShipmentsByProductId struct {
 	ShipmentId   uuid.UUID  `json:"shipment_id" db:"shipment_id"`
 }
 
+type ShipmentProducts struct {
+	ShipmentId   uuid.UUID `json:"shipment_id" db:"shipment_id"`
+	OrderItemsId uuid.UUID `json:"order_items_id" db:"order_items_id"`
+	Quantity     int       `json:"quantity" db:"quantity"`
+}
+
+type OrderItems struct {
+	ID        uuid.UUID `json:"id" db:"id"`
+	OrderId   uuid.UUID `json:"order_id" db:"order_id"`
+	ProductId uuid.UUID `json:"product_id" db:"product_id"`
+	Quantity  int       `json:"quantity" db:"quantity"`
+}
+
 type OrderService interface {
 	CreateNewOrder(order *Order) error
 	AddProductToOrder(productId, orderId uuid.UUID, quantity int) error
-	AddProductsToOrder(product []Product) error
+	AddProductsToOrder(product []OrderItems) error
+	GetQuantityByOrderItemId(orderItemId uuid.UUID) (int, error)
 }
 
 type ProductService interface {
@@ -59,7 +73,7 @@ type ProductService interface {
 type ShipmentService interface {
 	CreateNewShipment(shipment *Shipment) error
 	AddProductToShipment(shipmentId, itemId uuid.UUID, quantity int) error
-	AddProductsToShipment(product []Product) error
+	AddProductsToShipment(items []ShipmentProducts) error
 	GetShipmentsByItemId(itemId uuid.UUID) ([]ShipmentsByProductId, error)
 	FindShipment(shipmentId uuid.UUID) (*Shipment, error)
 }

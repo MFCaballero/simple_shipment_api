@@ -15,16 +15,16 @@ type ProductHandler struct {
 
 func (ph *ProductHandler) CreateNewProduct(w http.ResponseWriter, r *http.Request) {
 	product := db.Product{}
-	errDecoding := json.NewDecoder(r.Body).Decode(&product)
-	if errDecoding != nil {
-		log.Println(errDecoding)
+	err := json.NewDecoder(r.Body).Decode(&product)
+	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	product.ID = uuid.New()
-	errDbCreateProduct := ph.store.CreateNewProduct(&product)
-	if errDbCreateProduct != nil {
-		log.Println(errDbCreateProduct)
+	err = ph.store.CreateNewProduct(&product)
+	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -32,9 +32,9 @@ func (ph *ProductHandler) CreateNewProduct(w http.ResponseWriter, r *http.Reques
 }
 
 func (ph *ProductHandler) GetProducts(w http.ResponseWriter, r *http.Request) {
-	products, errDbGetProducts := ph.store.GetAllProducts()
-	if errDbGetProducts != nil {
-		log.Println(errDbGetProducts)
+	products, err := ph.store.GetAllProducts()
+	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

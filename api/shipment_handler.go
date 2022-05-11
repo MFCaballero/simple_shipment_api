@@ -2,10 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/MFCaballero/simple_shipment_api.git/db"
@@ -20,9 +20,16 @@ type ShipmentHandler struct {
 func (sh *ShipmentHandler) CreateNewShipmentWithItems(w http.ResponseWriter, r *http.Request) {
 	capacity := r.URL.Query().Get("capacity")
 	log.Println("capacity ", capacity)
-	capacityFloat, errCapacityFloat := strconv.ParseFloat(capacity, 32)
-	if errCapacityFloat != nil {
-		log.Println(errCapacityFloat)
+	var items []db.ShipmentProducts
+	err := json.NewDecoder(r.Body).Decode(&items)
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	capacityFloat, err := strconv.ParseFloat(capacity, 32)
+	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -31,50 +38,41 @@ func (sh *ShipmentHandler) CreateNewShipmentWithItems(w http.ResponseWriter, r *
 		Capacity:  float32(capacityFloat),
 		StartDate: time.Now(),
 	}
-	errDbCreateShipment := sh.store.CreateNewShipment(shipment)
-	if errDbCreateShipment != nil {
-		log.Println(errDbCreateShipment)
+	err = sh.store.CreateNewShipment(shipment)
+	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	var items map[uuid.UUID]int
-	errDecoding := json.NewDecoder(r.Body).Decode(&items)
-	if errDecoding != nil {
-		log.Println(errDecoding)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	//Improvement: add verification for unique keys in products map
-	dbErrors := make(chan error)
-	var wg sync.WaitGroup
-	wg.Add(len(items))
-	//TODO: this works but would be more efficient using bulk sql insert instead of single
-	//TODO: add verification for quantity to not be greater than order_item quantity
-	for item, quantity := range items {
-		go func(itemId uuid.UUID, quantity int) {
-			errDbAddProductToShipment := sh.store.AddProductToShipment(shipment.ID, itemId, quantity)
-			if errDbAddProductToShipment != nil {
-				dbErrors <- errDbAddProductToShipment
-				wg.Done()
-				return
-			}
-			log.Println("done")
-			dbErrors <- nil
-			wg.Done()
-		}(item, quantity)
-	}
-	go func() {
-		wg.Wait()
-		close(dbErrors)
-	}()
-	for err := range dbErrors {
+	response := map[string]interface{}{}
+	response["shipment_status"] = fmt.Sprintf("shipment successfully created with id: %v", shipment.ID)
+	for i := 0; i < len(items); i++ {
+		quantity, err := sh.store.GetQuantityByOrderItemId(items[i].OrderItemsId)
 		if err != nil {
 			log.Println(err)
+			response["items_status"] = fmt.Sprintf("error trying to get order item quantity %s", err.Error())
 			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(response)
 			return
 		}
+		if quantity < items[i].Quantity {
+			response["items_status"] = fmt.Sprintf("error bad request, quantity %v cannot be greater than %v", items[i].Quantity, quantity)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+		items[i].ShipmentId = shipment.ID
 	}
+	if err = sh.store.AddProductsToShipment(items); err != nil {
+		log.Println(err)
+		response["items_status"] = fmt.Sprintf("error trying to add products to shipment %s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(response)
+		return
+	}
+	response["items_status"] = "success"
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (sh *ShipmentHandler) TrackShipment(w http.ResponseWriter, r *http.Request) {

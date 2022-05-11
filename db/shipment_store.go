@@ -27,7 +27,11 @@ func (ss *ShipmentStore) AddProductToShipment(shipmentId, itemId uuid.UUID, quan
 	return nil
 }
 
-func (ss *ShipmentStore) AddProductsToShipment(product []Product) error {
+func (ss *ShipmentStore) AddProductsToShipment(items []ShipmentProducts) error {
+	_, err := ss.NamedExec("insert into shipment_products (shipment_id, order_items_id, quantity) values (:shipment_id, :order_items_id, :quantity)", items)
+	if err != nil {
+		return fmt.Errorf("error adding products to shipment: %w", err)
+	}
 	return nil
 }
 
